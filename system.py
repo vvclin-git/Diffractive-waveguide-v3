@@ -146,7 +146,6 @@ class System3D:
                         for eid in self.layers[zl]:
                             hit = self.elements[eid][1].contains_points(hit_rays[:,9:11],radius=1E-3)
                             if np.any(hit):
-                                print(hit_rays[hit,4:6],hit_rays[hit,-1])
                                 self.rays[wavelength] += [hit_rays[hit]] 
                                 hit_rays[hit,-1] = eid
                                 next_krays += [self.elements[eid][0].launched(deepcopy(hit_rays[hit]))]

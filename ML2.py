@@ -48,7 +48,7 @@ res = s2d.check(wid = 0)
 #%%
 s3d = System3D()
 s3d.add_source(0,[38,18.33,0],
-               {'fov':[-20,-20,20,20],
+               {'fov':[0,0,0,0],
                 'wavelength_list':[0.525],
                 'fov_grid':(1,1),
                 'spatial_grid':(1,1),

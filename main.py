@@ -105,7 +105,7 @@ s3d.add_path({'G1':{1:[[-1,1,0],[-1,0,0]]},
 
 # %%
 s3d.tracing(max_iter = 300)
-#s3d.draw()
+s3d.draw()
 # %%
 t0 = time.time()
 s3d.generate_graph('linegraph')

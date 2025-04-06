@@ -111,14 +111,15 @@ class Display3D:
     def __init__(self,width,height,near = 0.1,far = 150):
         self.obj_list = []
         self.windews_size = (width,height)
-        self.x0,self.y0,self.z0 = 0,0,-50
-        self.h_angle,self.v_angle= 0,0
+        self.x0,self.y0,self.z0 = -15.27,-12.85,-95
+        self.h_angle,self.v_angle= 4,154
         self.left_down = False
         self.right_down = False
         self.near,self.far = near,far
+        self.screenshot_count = 0
 
         pygame.init()
-        pygame.display.set_mode(self.windews_size, DOUBLEBUF | OPENGL)
+        self.screen = pygame.display.set_mode(self.windews_size, DOUBLEBUF | OPENGL)
         glEnable(GL_BLEND)
         glEnable(GL_DEPTH_TEST)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
@@ -129,7 +130,7 @@ class Display3D:
         
         glClearColor(1, 1, 1, 1)
 
-    def _mouse_event(self):
+    def _control_event(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                 self.close()
@@ -164,12 +165,26 @@ class Display3D:
                     self.x0 += (dx * abs(self.z0)+0.1) * 0.001
                     self.y0 -= (dy * abs(self.z0)+0.1) * 0.001
 
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_s:  # 如果按下的是 S 鍵
+                    width, height = self.windews_size
+                    # 從 OpenGL 讀取像素資料
+                    pixels = glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE)
+                    image = pygame.image.fromstring(pixels, (width, height), "RGB")
+                    # 上下顛倒（OpenGL 的座標是左下為原點，Pygame 是左上）
+                    image = pygame.transform.flip(image, False, True)
+                    filename = f"screenshot_{self.screenshot_count}.png"
+                    pygame.image.save(image, filename)
+                    print(f"畫面已儲存為 {filename}")
+                    self.screenshot_count += 1
+
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glLoadIdentity()
         gluPerspective(45, (self.windews_size[0] / self.windews_size[1]), self.near, self.far)
         glTranslatef(self.x0, self.y0, self.z0)
         glRotatef(self.h_angle, 1, 0, 0)
         glRotatef(self.v_angle, 0, 1, 0)
+        #print(self.x0, self.y0, self.z0, self.h_angle,self.v_angle)
 
         return True
 
@@ -214,7 +229,7 @@ class Display3D:
 
     def draw(self):
         while True :
-            if self._mouse_event():
+            if self._control_event():
                 for obj in self.obj_list:
                     obj.draw()
                     self.draw_axes(abs(0.03*self.z0))
