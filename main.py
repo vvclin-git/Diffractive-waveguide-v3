@@ -46,7 +46,7 @@ res = s2d.check(wid = 0)
 #%%
 s3d = System3D()
 s3d.add_source(-1,[-38,12,0],
-               {'fov':[0,0,0,0],
+               {'fov':[10,10,0,0],
                 'wavelength_list':[0.525],
                 'fov_grid':(1,1),
                 'spatial_grid':(1,1),
@@ -83,52 +83,21 @@ s3d.add_element(0.6,Fresnel_loss,waveguide_shape,
                  'index':[LASF46B,Air]})
 
 #Eyebox
-s3d.add_element(-20,Receiver,s2d.eyebox,
-                      {'name': 'R1',})
-
-# s3d.add_element(20,Receiver,s2d.eyebox,
-#                       {'name': 'eyeglow',})
+s3d.add_element(-s2d.relief,Receiver,s2d.eyebox,
+                {'name': 'R1'})
 
 s3d.add_path({'G1':{1:[[-1,1,0],[-1,0,0]]},
               'G2':{1:[[-1,0,0],[-1,1,0],[-1,-1,0]]},
               'G3':{1:[[-1,0,0],[-1,1,0]]}})
-
-# s3d.add_path({'G1':{1:[[-1,1,0],[-1,0,0]]},
-#               'G2':{1:[[-1,0,0],[-1,1,0],[-1,-1,0]]},
-#               'G3':{1:[[-1,0,0],[1,1,0]]}})
-
-#Transmittion IC
-# s3d.add_path({'G1':{-1:[[-1,1,0]], 1:[[-1,0,0],[-1,-1,0]]},
-#               'G2':{1:[[-1,0,0],[-1,1,0],[-1,-1,0]]},
-#               'G3':{1:[[-1,0,0],[-1,1,0]]}})
-
 
 # %%
 s3d.tracing(max_iter = 300)
 s3d.draw()
 # %%
 t0 = time.time()
-s3d.generate_graph('linegraph')
+s3d.generate_graph('graph')
 print(time.time()-t0)
 #%%
 #%matplotlib qt5
 s3d.draw_graph(0,arrow = True)
-
-
-
-# %%
-k = [[0.525]+DG.es[0]['k'] for DG in s3d.graph[0.525]]
-RCT = Rays_convert_tool(input_format = 'k',output_format = 'hv')
-hv = RCT.convert(k)
-
-
-#%%
-C = np.array([[1, 2], 
-              [3, 4]])
-
-D = np.array([[5, 6], 
-              [7, 8]])
-
-print(C @ D)   # 矩陣乘法
-
 # %%

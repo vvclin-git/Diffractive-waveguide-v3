@@ -47,7 +47,7 @@ class System3D:
                                for name in config.keys() if self.elements[i][0].name == name}
         self.pid += 1
 
-    def draw(self,unique = False):
+    def draw(self,unique = False, extra_planes = []):
         import visualization as vis
         view3d = vis.Display3D(1200,900,far = 200)
 
@@ -61,7 +61,7 @@ class System3D:
 
         #draw rays
         if hasattr(self,'rays'):
-            #[wavelength,kx,ky,kz,m,n,x0,y0,z0,x,y,z,eid]
+            #[wavelength,kx,ky,kz,x0,y0,z0,x,y,z,eid]
             for wavelength in self.rays:
                 if wavelength >0.6:
                     colors = [1,0,0]
@@ -75,7 +75,7 @@ class System3D:
                 if unique:
                     rays = np.unique(rays,axis = 0)
                 if rays.shape[1]>3:
-                    rays= rays[:,6:12].reshape(-1,3).astype(np.float32)
+                    rays= rays[:,4:10].reshape(-1,3).astype(np.float32)
                 rays = vis.Buffer_rays(rays,colors = colors, width = 1)
                 view3d.add_obj(rays)
 
@@ -94,6 +94,13 @@ class System3D:
                     volume_surface += [(z,ie)]
                 else: 
                     pass
+        #draw extra_planes
+        for vertices in extra_planes:
+            colors = [0, 0, 0, 0]
+            element = vis.polygon(vertices[:-1],colors = colors)
+            element = vis.Buffer_obj(*element,edge_color = [0.7,0.7,0.7],offset = True)
+            view3d.add_obj(element)
+        
 
         #draw volume
         for i in range(len(volume_surface)//2):
@@ -112,9 +119,9 @@ class System3D:
         if not self.sources:
             print('This system have not source')
             return
-        source_krays =  np.vstack([self.sources[sid].launch() for sid in self.sources]) #[wavelength,kx,ky,kz,m,n,x,y,z]
+        source_krays =  np.vstack([self.sources[sid].launch() for sid in self.sources]) #[wavelength,kx,ky,kz,x,y,z]
         source_krays = np.hstack((source_krays, np.zeros((source_krays.shape[0], 4)))) #Expand 4 columns to place [x,y,z,eid]
-        #[wavelength,kx,ky,kz,m,n,x0,y0,z0,x,y,z,eid]
+        #[wavelength,kx,ky,kz,x0,y0,z0,x,y,z,eid]
         for wavelength in self.wavelengths:
             self.rays[wavelength] = []
             kpath = self.kpath if self.kpath else [-1]
@@ -127,42 +134,39 @@ class System3D:
                     #Rays propagate to next surface
                     index = np.sqrt(np.sum(krays[:,1:4]**2,axis = 1))
                     direction_cosine = krays[:,1:4]/index[:,np.newaxis]
-                    delta_z = np.asarray(list(self.layers.keys()))-krays[:,8:9]
+                    delta_z = np.asarray(list(self.layers.keys()))-krays[:,6:7]
                     step = delta_z/direction_cosine[:,-1:]
                     step = np.min(np.where(step > 0, step, np.inf), axis=1)
                     alive = np.isfinite(step)
                     krays = krays[alive]
                     step = direction_cosine[alive]*step[alive,np.newaxis]
-                    krays[:,9:12] = np.round(krays[:,6:9] + step, 4)
+                    krays[:,7:10] = np.round(krays[:,4:7] + step, 4)
 
                     #Rays interact with elements
                     next_krays = []
-                    z_list = set(krays[:,11])
+                    z_list = set(krays[:,-2])
                     for zl in z_list:
-                        hitting = krays[:,11] == zl
+                        hitting = krays[:,-2] == zl
                         hit_rays = krays[hitting]
                         krays = krays[~hitting]
 
                         for eid in self.layers[zl]:
-                            hit = self.elements[eid][1].contains_points(hit_rays[:,9:11],radius=1E-3)
+                            hit = self.elements[eid][1].contains_points(hit_rays[:,7:9],radius=1E-3)
                             if np.any(hit):
-                                self.rays[wavelength] += [hit_rays[hit]] 
                                 hit_rays[hit,-1] = eid
-                                next_krays += [self.elements[eid][0].launched(deepcopy(hit_rays[hit]))]
+                                self.rays[wavelength] += [hit_rays[hit]] 
+                                next_krays += [self.elements[eid][0].launched(hit_rays[hit])]
                                 hit_rays = hit_rays[~hit]
                         if hit_rays.size != 0:
                             next_krays += [hit_rays]
 
                     if len(next_krays) != 0:
                         krays = np.vstack(next_krays)
-                        krays[:,6:9] = krays[:,9:12]
+                        krays[:,4:7] = krays[:,7:10]
                     else:
                         break
             if self.rays[wavelength]:
                 self.rays[wavelength] = np.vstack(self.rays[wavelength])
-
-
-
 
     def generate_graph(self,type = 'graph',end_eid = None):
         if not hasattr(self,'rays'):
@@ -224,7 +228,7 @@ class System3D:
                     for key_values in [('wavelength',0.525),('kin',kin),('kout',kout),('eid',eid),('xyz',xyz)]:
                         LG.es.set_attribute_values(*key_values)
                     self.linegraph[wavelength] += [LG]
-                       
+            
     def draw_graph(self,graph_index,edge_width = 1, node_size = 80, arrow = False, show_index = False, label_size = 12):
         import matplotlib.patches as patches
         if not hasattr(self,'graph'):
@@ -405,16 +409,28 @@ class System_2D:
         self.kd = kdomain
         self.boundary = np.array(boundary)
         self.lmax = np.sqrt((self.boundary[0,1]-self.boundary[0,0])**2+(self.boundary[1,1]-self.boundary[1,0])**2)
-    
-    def set_eyebox(self,relief,shape):
+          
+    def set_eyebox(self,relief,shape, euler_angles = ()):
         self.active_oc = {}
         self.eyebox = Point(shape[:2]).buffer(shape[2]) if np.asarray(shape).ndim == 1 else Polygon(shape)
+        self.relief = np.round(relief,4)
+        if euler_angles:
+            points = np.asarray(self.eyebox.exterior.coords.xy)
+            points = np.vstack((points,relief*np.ones_like(points[0]))).T
+            points = System_2D.euler_rotate(points, euler_angles)
+            self.relief = np.round(points[np.argmin(np.abs(points[:,2])),2],4) #Effective eye-relief
+            delta_z = points[:,2]-self.relief
+            m = delta_z/self.kd.k_out[0][3,:,3:4]
+            dxdy = self.kd.k_out[0][3,:,np.newaxis,1:3]*m[:,:,np.newaxis]
+            points = points[np.newaxis,:,:2]-dxdy
+            self.eyebox = unary_union([Polygon(p) for p in points]).convex_hull #Effective Projected eyebox
+
         for sid in self.kd.sequences.keys():
-            m = relief/self.kd.k_out[sid][3,:,3]
+            m = self.relief/self.kd.k_out[sid][3,:,3]
             dxdy = self.kd.k_out[sid][3,:,1:3]
             self.active_oc[sid] = [translate(self.eyebox,xoff=-m[i]*dxdy[i,0], yoff=-m[i]*dxdy[i,1]) if not np.isnan(m[i]) else Polygon()  
                                     for i in range(len(m))]
-                    
+                 
     def set_input(self,shape):
         self.ic_beam = {}
         shape = np.asarray(shape)
@@ -568,4 +584,32 @@ class System_2D:
                     max_distance = distance
                     line_pair = (line1, line2)
         return MultiLineString(line_pair)
-        
+
+    @staticmethod   
+    def euler_rotate(points, angles_deg, rotation_order='zyx'):
+        '''
+        angles_deg = (alpha, beta, gamma)
+        orcer: "zyx" mean is new_P=Rz.Ry.Rx.P'
+        '''
+        angles_rad = np.deg2rad(angles_deg)
+        center = (np.max(points,axis = 0)+np.min(points,axis = 0))/2
+        points = points-center
+        R = np.eye(3)
+
+        order_map = {'x': 0, 'y': 1, 'z': 2}
+        order = [order_map[axis] for axis in rotation_order]
+        for axis, theta in zip(order, angles_rad[order]):
+            c, s = np.cos(theta), np.sin(theta)
+            if axis == 0: #x
+                R_axis = np.array([[1, 0, 0],[0, c, -s],[0, s, c]])
+            elif axis == 1: #y
+                R_axis = np.array([[c, 0, s],[0, 1, 0],[-s, 0, c]])
+            elif axis == 2: #z
+                R_axis = np.array([[c, -s, 0],[s, c, 0],[0, 0, 1]])
+            else:
+                raise ValueError("the formula of order is wrong")
+            R = R_axis @ R
+        rotated_points = points @ R.T
+        rotated_points += center
+        return rotated_points    
+

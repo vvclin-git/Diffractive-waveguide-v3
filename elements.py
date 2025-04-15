@@ -93,8 +93,6 @@ class Source:
                                 h.reshape(-1),
                                 v.reshape(-1), 
                                 direct*np.ones_like(h.reshape(-1)),
-                                np.zeros_like(h.reshape(-1)),
-                                np.zeros_like(h.reshape(-1)),
                                 x.reshape(-1),
                                 y.reshape(-1),
                                 z*np.ones_like(h.reshape(-1)),
@@ -105,7 +103,7 @@ class Source:
             self.polygon = mpath.Path.circle(shape[:2], shape[2]) if shape.ndim == 1 else mpath.Path(shape)
 
     def launch(self):
-        #k_in: [[wavelength,kx,ky,kz,m,n,x,y,z,...]]
+        #k_in: [[wavelength,kx,ky,kz,x,y,z,...]]
         tool = Rays_convert_tool()
         self.rays = deepcopy(self.field)
         if hasattr(self,'polygon'):
@@ -113,13 +111,15 @@ class Source:
                              self.polygon.vertices.max(axis = 0))).T
             wx,wy = np.max(box,axis = 1) - np.min(box,axis = 1)
             xc,yc = (np.max(box,axis = 1) + np.min(box,axis = 1))/2
-            self.rays[:,6] = wx*self.rays[:,6]- wx/2 + xc
-            self.rays[:,7] = wy*self.rays[:,7]- wy/2 + yc
-            self.rays[:,6:9] = np.round(self.rays[:,6:9],4)
+            self.rays[:,4] = wx*self.rays[:,4]- wx/2 + xc
+            self.rays[:,5] = wy*self.rays[:,5]- wy/2 + yc
+            self.rays[:,4:7] = np.round(self.rays[:,4:7],4)
             if wx!=0 and wy != 0 and np.all(self.sgrid != [1,1]):
-                mask = self.polygon.contains_points(self.rays[:,6:8], radius=1E-3)
+                mask = self.polygon.contains_points(self.rays[:,4:6], radius=1E-3)
                 self.rays = self.rays[mask]
-        return tool.convert(self.rays)
+        k_out = tool.convert(self.rays)
+        k_out[:,1:4] = np.round(k_out[:,1:4],6)
+        return k_out
         
 class Grating:
     def __init__(self, name, periods, index,
@@ -158,32 +158,35 @@ class Grating:
             self.g_vectors = (1/self.periods[:,0]*np.array([np.cos(g_phi),np.sin(g_phi)])).T
 
     def launched(self, k_in):
-        #k_in: [[wavelength,kx,ky,kz,m,n,x,y,z,...]]
+        #k_in: [[wavelength,kx,ky,kz,x,y,z,...]]
         k_out = []
         for in_direct in self.diffract_order.keys():
             kray = deepcopy(k_in[np.where(k_in[:,3]>0,1,-1) == in_direct])
             if kray.size != 0:
                 diff_order = np.asarray(self.diffract_order[in_direct])
                 order_gv = diff_order[:,-2:] @ self.g_vectors  #[[m,n]] @ [gv1,gv2] = [[m*gv1+n*gv2]]
-                kray,order_gv,output = (np.repeat(kray,len(order_gv),axis = 0),
+                kray,order_gv,out_direct = (np.repeat(kray,len(order_gv),axis = 0),
                                         np.tile(order_gv,(len(kray),1)),
-                                        np.tile(diff_order,(len(kray),1)))
+                                        np.tile(diff_order[:,0],(len(kray))))
                 if self.mode == 'T&TIR':
                     TIR = (kray[:,1]**2+kray[:,2]**2) >= 1
-                    Transmission = output[:,0] == in_direct
+                    Transmission = out_direct == in_direct
                     
-                n_out = np.where(output[:,0]>0,self.index[1](kray[:,0]),self.index[0](kray[:,0]))
+                n_out = np.where(out_direct>0,self.index[1](kray[:,0]),self.index[0](kray[:,0]))
                 kray[:,1:3] += kray[:,0:1]*order_gv
-                kray[:,4:6] = output[:,1:]
                 k2xy = kray[:,1]**2+kray[:,2]**2
                 k2z = n_out**2-k2xy
                 exist = k2z>0
                 if self.mode == 'T&TIR':
                     exist[np.all([~TIR,~Transmission],axis = 0)] = False 
-                kray[exist,3] = np.where(output[exist,0]>0,1,-1)*np.sqrt(k2z[exist])
+                kray[exist,3] = np.where(out_direct[exist]>0,1,-1)*np.sqrt(k2z[exist])
                 k_out += [kray[exist]]
-        k_out  = np.vstack(k_out)
-        k_out = np.unique(k_out,axis = 0)
+        if k_out:
+            k_out  = np.vstack(k_out)
+            k_out[:,1:4] = np.round(k_out[:,1:4],6)
+            k_out = np.unique(k_out,axis = 0)
+        else:
+            k_out = np.empty((0, k_in.shape[1]))
         return k_out
     
     def launched_k(self,k_in,order,material_i):
@@ -223,7 +226,7 @@ class Fresnel_loss:
         return np.hstack((r_matrix,t_matrix)).T.reshape((-1,2,2,2))
 
     def launched(self,k_in):
-        #k_in: [[wavelength,kx,ky,kz,m,n,x,y,z,...]]
+        #k_in: [[wavelength,kx,ky,kz,x,y,z,...]]
         n_out = np.where(k_in[:,3]>0,self.index[1](k_in[:,0]),self.index[0](k_in[:,0]))
         n_in = np.where(k_in[:,3]>0,self.index[0](k_in[:,0]),self.index[1](k_in[:,0]))
         Tkz2 = n_out**2-(k_in[:,1]**2+k_in[:,2]**2)
@@ -233,7 +236,7 @@ class Fresnel_loss:
         Rk_out[:,3] = (-np.where(k_in[:,3]>0,1,-1)[Tkz2<0]*np.sqrt(Rkz2[Tkz2<0]))
         k_out = np.vstack((Rk_out,Tk_out))
         k_out = np.unique(k_out,axis = 0)
-        k_out[:,4:6] = 0
+        k_out[:,1:4] = np.round(k_out[:,1:4],6)
         return k_out
 
 class ColorFilter:
@@ -242,12 +245,11 @@ class ColorFilter:
         self.stop_wavelength = stop_wavelength
 
     def launched(self, k_in):
-        #k_in: [[wavelength,kx,ky,kz,m,n,x,y,z,...]]
+        #k_in: [[wavelength,kx,ky,kz,x,y,z,...]]
         if k_in.size>0:
             k_out = k_in[k_in[:,0]!=self.stop_wavelength]
         else:
             k_out = np.empty((0, k_in.shape[1]))
-        k_out[:,4:6] = 0
         return k_out
 
 class Receiver:
@@ -256,7 +258,7 @@ class Receiver:
         self.store = []
 
     def launched(self, k_in):
-        #k_in: [[wavelength,kx,ky,kz,m,n,x,y,z,...]]
+        #k_in: [[wavelength,kx,ky,kz,x,y,z,...]]
         if k_in.size>0:
             self.store += [k_in]
         return np.empty((0, k_in.shape[1]))

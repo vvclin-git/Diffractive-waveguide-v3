@@ -41,9 +41,10 @@ def polygon(vertices,colors = [1,0,1,0.5]):
     return vertices, edges, surfaces, colors
 
 class Buffer_obj:
-    def __init__(self,vertices, edges, surfaces, colors, offset = False):
+    def __init__(self,vertices, edges, surfaces, colors, edge_color = (0,0,0) ,offset = False):
         self.vbo,self.ebo,self.sbo = glGenBuffers(3)
-        self.vertices, self.edges, self.surfaces, self.colors = vertices, edges, surfaces,colors
+        self.vertices, self.edges, self.surfaces = vertices, edges, surfaces
+        self.colors,self.edge_color = colors, edge_color
         self.num_surfaces,self.num_edges = len(self.surfaces),len(self.edges)
         self.offset = offset
         glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
@@ -78,7 +79,7 @@ class Buffer_obj:
                 glDisable(GL_POLYGON_OFFSET_FILL) # 禁用多邊形偏移
         #edge
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-        glColor3f(0, 0, 0)
+        glColor3f(*self.edge_color)
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ebo)
         glDrawElements(GL_LINES, self.num_edges * 2, GL_UNSIGNED_INT, None)
 
