@@ -129,16 +129,23 @@ class Grating:
                                    -1:[[ 1,-1,0],[ 1,0,0],[ 1,1,0],
                                        [-1,-1,0],[-1,0,0],[-1,1,0]]}):
         ''' 
+        # periods
+        'periods': [[period, grating vector]]
+        period: grating pitch (unit µm)
+        grating vector: the angle between grating vector and k_x axis (±180° or 0°-360°)
+
         #index
         [Material_1,material_2]
         if the ray's direction is positive, the ray propagates from Material_1 to Material_2
         if the ray's direction is negative, the ray propagates from Material_2 to Material_1
+        
         #diffract_order
         {in-direct:[[out-direct,m_order,n_order]]}
         in-direct:  +z=1, -z=-1
         out-direct: +z=1, -z=-1
         if in-direct = out-direct, diffractive mode is transmission mode
         if in-direct != out-direct, diffractive mode is reflection mode
+        
         #mode
         All: (default) Calculate all diffraction behavior if it is set in 'diffract_order'.
         T&TIR: Only calculate T-order diffraction behavior unless the R-order diffraction behavior is within the TIR region..
