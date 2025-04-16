@@ -18,32 +18,37 @@ from PySide6.QtWidgets import (
     QLabel,
     QComboBox,
     QFileDialog,
-    QMessageBox
+    QMessageBox,
+    QSizePolicy
 )
 
-CONFIG_PATH = '.\\Configs\\'
+CONFIG_PATH = '.\\configs'
 
-# --- Updated widget for a grating element ---
+# --- Updated widget for a grating element with additional fields ---
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, QLineEdit, QDoubleSpinBox, QComboBox, QPushButton, QListWidget
+from PySide6.QtCore import Qt
+
 class GratingElementWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._initUI()
+        
     
     def _initUI(self):
         mainLayout = QVBoxLayout(self)
         mainLayout.setContentsMargins(5, 5, 5, 5)
         
-        # --- Always visible header that shows core grating parameters ---
+        # --- Always visible header row ---
         headerLayout = QHBoxLayout()
         
-        # Grating Name: Editable text field
+        # Grating Name
         nameLabel = QLabel("Name:")
         self.nameEdit = QLineEdit(self)
         self.nameEdit.setPlaceholderText("Enter grating name")
         headerLayout.addWidget(nameLabel)
         headerLayout.addWidget(self.nameEdit)
         
-        # Grating Pitch (Period) with unit nm
+        # Grating Pitch (Period) with unit "nm"
         pitchLabel = QLabel("Pitch:")
         self.pitchSpin = QDoubleSpinBox(self)
         self.pitchSpin.setRange(0.0, 10000.0)
@@ -61,44 +66,119 @@ class GratingElementWidget(QWidget):
         headerLayout.addWidget(vectorLabel)
         headerLayout.addWidget(self.vectorAngleSpin)
         
+        # Order field – text input for comma-delimited unique integers
+        orderLabel = QLabel("Order:")
+        self.orderEdit = QLineEdit(self)
+        self.orderEdit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.orderEdit.setPlaceholderText("e.g. -1,0,1")
+        headerLayout.addWidget(orderLabel)
+        headerLayout.addWidget(self.orderEdit)
+        
         mainLayout.addLayout(headerLayout)
         
-        # --- Optional: Advanced options area that can be toggled ---
+        # --- Advanced row toggle button ---
         self.advancedButton = QPushButton("Show Advanced", self)
         self.advancedButton.setCheckable(True)
         self.advancedButton.setChecked(False)
         self.advancedButton.toggled.connect(self.toggleAdvanced)
         mainLayout.addWidget(self.advancedButton)
         
+        # --- Advanced area arranged horizontally ---
         self.advancedArea = QWidget(self)
-        advLayout = QFormLayout(self.advancedArea)
-        self.advancedOption = QLineEdit(self)
-        self.advancedOption.setPlaceholderText("Advanced parameter")
-        advLayout.addRow("Advanced Option:", self.advancedOption)
+        advLayout = QHBoxLayout(self.advancedArea)
+        advLayout.setContentsMargins(0, 0, 0, 0)
+        
+        # Mode: dropdown
+        modeLabel = QLabel("Mode:")
+        self.modeCombo = QComboBox(self)
+        self.modeCombo.addItems(["All", "T&TIR"])
+        advLayout.addWidget(modeLabel)
+        advLayout.addWidget(self.modeCombo)
+        
+        # Pitch 2
+        pitch2Label = QLabel("Pitch 2:")
+        self.pitch2Spin = QDoubleSpinBox(self)
+        self.pitch2Spin.setRange(0.0, 10000.0)
+        self.pitch2Spin.setDecimals(3)
+        self.pitch2Spin.setSuffix(" nm")
+        advLayout.addWidget(pitch2Label)
+        advLayout.addWidget(self.pitch2Spin)
+        
+        # Vector Angle 2
+        vector2Label = QLabel("Vector Angle 2:")
+        self.vectorAngle2Spin = QDoubleSpinBox(self)
+        self.vectorAngle2Spin.setRange(-180.0, 180.0)
+        self.vectorAngle2Spin.setDecimals(1)
+        self.vectorAngle2Spin.setSuffix(" °")
+        advLayout.addWidget(vector2Label)
+        advLayout.addWidget(self.vectorAngle2Spin)
+        
+        # Order 2
+        order2Label = QLabel("Order 2:")
+        self.order2Edit = QLineEdit(self)
+        self.order2Edit.setPlaceholderText("e.g. -1,0,1")
+        self.orderEdit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        advLayout.addWidget(order2Label)
+        advLayout.addWidget(self.order2Edit)
+        
         self.advancedArea.setVisible(False)
         mainLayout.addWidget(self.advancedArea)
     
     def toggleAdvanced(self, checked):
         self.advancedArea.setVisible(checked)
+        # Force advanced area and widget to recalc their sizes.
+        self.advancedArea.adjustSize()
+        self.adjustSize()
+        self.updateGeometry()
+        # If this widget is inside a QListWidget, update each item's size hint.
+        listWidget = self._findParentListWidget()
+        if listWidget:
+            for i in range(listWidget.count()):
+                item = listWidget.item(i)
+                widget = listWidget.itemWidget(item)
+                item.setSizeHint(widget.sizeHint())
+            listWidget.doItemsLayout()
         self.advancedButton.setText("Hide Advanced" if checked else "Show Advanced")
     
+    def _findParentListWidget(self):
+        parent = self.parent()
+        while parent:
+            if isinstance(parent, QListWidget):
+                return parent
+            parent = parent.parent()
+        return None
+    
     def getData(self):
-        # Retrieve the grating element data as a dictionary.
+        # Return a dictionary containing primary and advanced field values.
         return {
             "grating_name": self.nameEdit.text(),
             "pitch": self.pitchSpin.value(),
             "vector_angle": self.vectorAngleSpin.value(),
-            "advanced": self.advancedOption.text()
+            "order": self.orderEdit.text(),
+            "advanced": {
+                "mode": self.modeCombo.currentText(),
+                "pitch2": self.pitch2Spin.value(),
+                "vector_angle2": self.vectorAngle2Spin.value(),
+                "order2": self.order2Edit.text()
+            }
         }
     
     def setData(self, data):
-        # Set the widget values from the given configuration dictionary.
         self.nameEdit.setText(data.get("grating_name", ""))
         self.pitchSpin.setValue(data.get("pitch", 0))
         self.vectorAngleSpin.setValue(data.get("vector_angle", 0))
-        self.advancedOption.setText(data.get("advanced", ""))
+        self.orderEdit.setText(data.get("order", ""))
+        adv = data.get("advanced", {})
+        self.modeCombo.setCurrentText(adv.get("mode", "All"))
+        self.pitch2Spin.setValue(adv.get("pitch2", 0))
+        self.vectorAngle2Spin.setValue(adv.get("vector_angle2", 0))
+        self.order2Edit.setText(adv.get("order2", ""))
 
-# --- Grating Elements panel supporting drag and drop and enhanced button options ---
+
+
+
+
+# --- Grating Elements panel supporting drag, delete, and clear operations ---
 class GratingElementsWidget(QGroupBox):
     def __init__(self, parent=None):
         super().__init__("Grating Elements", parent)
@@ -110,7 +190,7 @@ class GratingElementsWidget(QGroupBox):
         self.listWidget.setDragDropMode(QListWidget.InternalMove)
         layout.addWidget(self.listWidget)
         
-        # Horizontal layout for buttons: Add, Delete, Clear
+        # Button row: Add, Delete, Clear
         btnLayout = QHBoxLayout()
         self.addButton = QPushButton("Add Grating", self)
         self.addButton.clicked.connect(self.addGrating)
@@ -134,7 +214,6 @@ class GratingElementsWidget(QGroupBox):
         self.listWidget.setItemWidget(item, widget)
     
     def deleteGrating(self):
-        # Delete the currently selected grating element
         row = self.listWidget.currentRow()
         if row >= 0:
             self.listWidget.takeItem(row)
@@ -142,7 +221,6 @@ class GratingElementsWidget(QGroupBox):
             QMessageBox.information(self, "No Selection", "Please select a grating to delete.")
     
     def clearGratings(self):
-        # Clear all grating elements from the list
         self.listWidget.clear()
     
     def getGratingElements(self):
@@ -234,7 +312,7 @@ class SystemParametersWidget(QGroupBox):
         whLayout.addWidget(self.eyeboxHeight)
         layout.addRow("Eyebox Size:", whLayout)
 
-        # Eye relief input.
+        # Eye relief
         self.eyeRelief = QDoubleSpinBox(self)
         self.eyeRelief.setRange(0, 1000)
         self.eyeRelief.setSuffix(" mm")
@@ -407,6 +485,6 @@ class MainWindow(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
-    window.resize(600, 600)
+    window.resize(900, 600)
     window.show()
     sys.exit(app.exec())

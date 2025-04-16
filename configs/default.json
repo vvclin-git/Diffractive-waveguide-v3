@@ -24,19 +24,37 @@
             "grating_name": "IC",
             "pitch": 379.5,
             "vector_angle": 11.0,
-            "advanced": ""
+            "order": "-1,0,1",
+            "advanced": {
+                "mode": "All",
+                "pitch2": 0,
+                "vector_angle2": 0,
+                "order2": ""
+            }
         },
         {
             "grating_name": "EPE",
             "pitch": 277.2,
             "vector_angle": -122.2,
-            "advanced": ""
+            "order": "-1,0,1",
+            "advanced": {
+                "mode": "T&TIR",
+                "pitch2": 0,
+                "vector_angle2": 0,
+                "order2": ""
+            }
         },
         {
             "grating_name": "OC",
             "pitch": 379.5,
             "vector_angle": 104.6,
-            "advanced": ""
+            "order": "-1,0,1",
+            "advanced": {
+                "mode": "T&TIR",
+                "pitch2": 0,
+                "vector_angle2": 0,
+                "order2": ""
+            }
         }
     ]
 }
