@@ -1,3 +1,4 @@
+
 import numpy as np
 import matplotlib.pyplot as plt
 from PySide6.QtCore import Qt
@@ -19,16 +20,15 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QMessageBox
 )
-from widgets import *
-from control import *
+from widgets.main_window import MainWindow
+from controller import *
 
+import sys
 
 
 app = QApplication(sys.argv)
 window = MainWindow()
-
-controller = AppController()
-
+backend = BackendService(window.controller)
 
 
 

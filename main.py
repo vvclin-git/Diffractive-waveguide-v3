@@ -10,7 +10,7 @@ LASF46B = Material('LASF46B',LASF46B_coefficient)
 
 kdom = K_domain(LASF46B)
 kdom.set_source({'fov':[-20,20,-15,15],
-                 'wavelength_list':[0.525],
+                 'wavelength_list':[0.45, 0.525, 0.65],
                  'fov_grid':(11,11)})
 #Doe1
 kdom.add_element(Grating,{'name': 'G1',

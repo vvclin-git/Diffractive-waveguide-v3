@@ -321,6 +321,8 @@ class K_domain:
         self.elements = {}
         self.eid = 0
         self.sid = 0
+        self.fig, self.ax = plt.subplots()
+        self.ax.grid(True)
 
     def set_source(self,options = {'fov':[-20,20,-15,15],
                                    'wavelength_list':[0.525],
@@ -360,8 +362,8 @@ class K_domain:
                 self.k_out[sid] = np.array(self.k_out[sid])
 
     def draw(self,sid_list = None):
-        fig, ax = plt.subplots()
-
+        # fig, ax = plt.subplots()
+        self.ax.clear()
         sid_list = sid_list if sid_list else self.sequences.keys()
         wavelength_list = []
         for sid in sid_list:
@@ -373,20 +375,22 @@ class K_domain:
                 colors[0.5>=k[:,0]] = [0,0,1]
 
                 wavelength_list += [k[:,0]]
-                ax.scatter(k[:,1],k[:,2], s=5, c=colors)
+                self.ax.scatter(k[:,1],k[:,2], s=5, c=colors)
 
         inner_r = np.average([self.index[0](wl) for wl in np.unique(wavelength_list)])
         inner_circle = plt.Circle((0, 0), inner_r, color='k', fill=False, linewidth=2)
-        ax.add_artist(inner_circle)
+        self.ax.add_artist(inner_circle)
         outer_r = np.average([self.index[1](wl) for wl in np.unique(wavelength_list)])
         outer_circle = plt.Circle((0, 0), outer_r, color='k', fill=False, linewidth=2)
-        ax.add_artist(outer_circle)
+        self.ax.add_artist(outer_circle)
 
-        ax.set_xlim(-np.ceil(outer_r), np.ceil(outer_r))
-        ax.set_ylim(-np.ceil(outer_r) ,np.ceil(outer_r))
-        ax.set_aspect('equal', 'box')
-        plt.grid(True)
-        plt.show()
+        self.ax.set_xlim(-np.ceil(outer_r), np.ceil(outer_r))
+        self.ax.set_ylim(-np.ceil(outer_r) ,np.ceil(outer_r))
+        self.ax.set_aspect('equal', 'box')
+        self.fig.canvas.draw_idle()
+        self.fig.show()
+        # plt.grid(True)
+        # plt.show()
 
     def report(self):
         for item,index in zip(['surrounding_material','substrate_material'],self.index):
